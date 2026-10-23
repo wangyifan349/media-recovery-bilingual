@@ -31,22 +31,25 @@ Both launchers use **the same recovery/verification code**, not independently ma
 
 There are no bundled third-party libraries, automatic installers, account sign-ins, telemetry or application-initiated network requests. These guarantees concern the application itself, not OS behavior or a browser/viewer you launch.
 
-### 📦 Optional dependencies — install only if you choose
+### 📦 Required Python libraries
 
-Core carving and PCM WAV checking use the Python standard library. Optional content checks are enabled when their dependencies are already available:
+Install the following Python libraries before starting. They are imported directly, without missing-library fallback branches. Core carving and PCM WAV reading use standard-library algorithms, but the application imports its verification libraries at startup:
 
 ```bash
 python -m pip install -r requirements.txt
 ```
 
-| Component | Used for | If missing |
+| Component | Used for | Requirement |
 | --- | --- | --- |
-| Pillow | Image identification, integrity checks, all-frame/page decoding and thumbnails | Recovery still runs; images are `UNVERIFIED` |
-| miniaudio | Streaming decode of supported MP3, FLAC, Ogg Vorbis and non-PCM WAV | PCM WAV still uses `wave`; other audio is not fully verified |
-| `pillow-heif` (separate, optional) | HEIC plugin registered automatically when installed | HEIC can still be carved, but may not be decodable |
-| FFmpeg executable on `PATH` (separate, optional) | Video decoding checks only | Video is `UNVERIFIED` |
+| Pillow | Image identification, integrity checks, exposed-frame/page decoding and thumbnails | Required |
+| miniaudio | Streaming decode of supported MP3, FLAC, Ogg Vorbis and non-PCM WAV | Required |
+| pillow-heif | Registered HEIC decoder plugin | Required |
 
-**Audio never calls FFmpeg or Windows-only audio components.** miniaudio is cross-platform, but includes native code/CFFI: it is **not pure Python**. Pillow also contains native components. Installing Python packages offline requires suitable wheels and their dependencies for your Python/OS; none are included in the source ZIP. AVIF decoding depends on the installed Pillow build and codec support.
+**All checks use Python code/libraries. No FFmpeg executable, external player or other external media program is used for verification.** The isolated verification worker is another Python process, not an external media tool. Video checks are structural only and video results remain `UNVERIFIED`; installing these libraries does not provide full video decoding. miniaudio, Pillow and pillow-heif contain native components: Python-package-only does **not** mean pure Python. Offline installation needs suitable wheels and their dependencies; none are bundled. AVIF depends on Pillow's codec support. Missing required libraries raise an ordinary import error; data/decoder/timeout exception handling is retained.
+
+### 🔠 Larger, adjustable interface
+
+The default UI font is **14 points**, with matching menu/heading fonts, padded buttons and taller result rows. Use **A− / A+** or the **Text size** menu to adjust it between 11 and 22 points without stopping recovery. Reset returns to 14 points. Font size is kept when switching languages for the current session. Format groups use tabs; settings/actions use multiple rows, long explanations wrap, and results have both scrollbars. The whole page can scroll vertically on smaller displays. Window size adapts to the display; extremely small displays or very large text may still require resizing/reducing text size. Gallery text is also larger.
 
 ## 🖱️ 3. Desktop workflow
 
@@ -79,10 +82,10 @@ There are **21 public scan selectors**, expanding to multiple possible suffixes.
 | `ogg` | `.ogg`, `.opus` | Ogg page boundaries, sequence/serial checks, CRC, EOS; OpusHead suffix hint | miniaudio for supported Ogg Vorbis; Opus is structure only |
 | `aiff` | `.aiff` | AIFF/AIFC FORM, COMM/SSND and chunk boundaries | Structure only |
 | `au` | `.au` | AU header, known data length and basic parameters | Structure only |
-| `mp4` | `.mp4`, `.mov`, `.m4a`, `.3gp`, `.heic`, `.avif` | Selected ftyp brands, allowed contiguous boxes; basic moov/mdat or meta/mdat checks | FFmpeg for video; Pillow/plugin for images; M4A is structure only |
-| `avi` | `.avi` | One RIFF AVI range, top-level chunk boundaries and LIST presence | FFmpeg; AVI/OpenDML continuations are not reassembled |
-| `mkv` | `.mkv`, `.webm` | EBML DocType hint and **finite-size** Segment | FFmpeg; unknown-size Segments are rejected |
-| `flv` | `.flv` | Header and selected tag types, lengths and PreviousTagSize | FFmpeg; boundary is heuristic |
+| `mp4` | `.mp4`, `.mov`, `.m4a`, `.3gp`, `.heic`, `.avif` | Selected ftyp brands, allowed contiguous boxes; basic moov/mdat or meta/mdat checks | Pillow/plugin for images; video and M4A are structure only |
+| `avi` | `.avi` | One RIFF AVI range, top-level chunk boundaries and LIST presence | Structure only; AVI/OpenDML continuations are not reassembled |
+| `mkv` | `.mkv`, `.webm` | EBML DocType hint and **finite-size** Segment | Structure only; unknown-size Segments are rejected |
+| `flv` | `.flv` | Header and selected tag types, lengths and PreviousTagSize | Structure only; boundary is heuristic |
 | `pdf` | `.pdf` | Header and first `%%EOF` with nearby `startxref` | Structure only; may recover an older incremental revision, not the latest document |
 | `zip` | `.zip`, `.docx`, `.xlsx`, `.pptx`, `.epub` | EOCD and central directory; member-name suffix hints | Standard-library member read/CRC checks; **not Office/EPUB semantic validation** |
 
@@ -100,7 +103,7 @@ Important exclusions and ambiguities:
 | --- | --- | --- |
 | `OK__` | The implemented decoder/read/CRC check completed without the specified failure | Perfect recovery, identical original content, semantic correctness, every codec feature validated, or malware-free |
 | `DAMAGED__` | A supported check detected a concrete content error, empty decode or insufficient data | That every other file was fully checked |
-| `UNVERIFIED__` | No compatible decoder, missing dependency, unsupported codec, skipped check, timeout, safety limit or inconclusive failure | Definitely damaged or definitely usable |
+| `UNVERIFIED__` | No integrated compatible decoder, unsupported codec, skipped check, timeout, safety limit or inconclusive failure | Definitely damaged or definitely usable |
 
 Checks are limited to what each library reports. A decoder can conceal errors or accept truncated-but-decodable content. miniaudio sample-count comparison allows **8192 interleaved samples** of tolerance; this is not exact original-length verification. PCM WAV reading checks the declared frame byte count, not whether audio sounds correct.
 
@@ -168,9 +171,9 @@ CLI exit codes: `0` = scan completed (not proof of successful recovery), `1` = r
 python -X utf8 -m unittest discover -s . -p "test_*.py" -v
 ```
 
-Tests create temporary synthetic media/container data; Pillow tests also generate real small images. They cover boundaries, malformed/truncated structures, no-overwrite exports, hashes, cancellation, language placeholders, English-only presentation and byte/status parity between editions. GUI tests require an interactive display and skip in GitHub Actions or when Tk/a display is unavailable; optional decoder tests skip when dependencies are missing. Synthetic MP3/MP4 fixtures are **structural tests, not proof of real-world audio/video decoding coverage**.
+Tests create temporary synthetic media/container data; Pillow tests also generate real small images. They cover boundaries, malformed/truncated structures, no-overwrite exports, hashes, cancellation, language placeholders, English-only presentation and byte/status parity between editions. Required libraries must be installed. GUI tests require an interactive display and skip in GitHub Actions or when Tk/a display is unavailable. Synthetic MP3/MP4 fixtures are **structural tests, not proof of real-world audio/video decoding coverage**.
 
-GitHub Actions is configured for Python 3.10/3.13 on Linux, Windows and macOS, plus an optional miniaudio job. Workflow configuration is not evidence that every remote run passed: check the repository's Actions results for the particular commit. No developer-machine diagnostics or environment inventories are distributed.
+GitHub Actions installs requirements and tests Python 3.10/3.13 on Linux, Windows and macOS, plus a Python-library job. Configuration alone is not evidence of success: check Actions for the particular commit. No developer-machine diagnostics or environment inventories are distributed.
 
 | File | Responsibility |
 | --- | --- |

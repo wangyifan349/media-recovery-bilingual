@@ -8,6 +8,10 @@ import wave
 import zipfile
 import zlib
 
+from PIL import Image, UnidentifiedImageError
+import miniaudio
+import pillow_heif
+
 from i18n import verification_result
 
 
@@ -20,19 +24,10 @@ MAX_IMAGE_FRAMES = 1000
 MAX_IMAGE_PIXELS = 150_000_000
 MAX_ARCHIVE_BYTES = 512 * 1024 * 1024
 MAX_ARCHIVE_ENTRIES = 10_000
+pillow_heif.register_heif_opener()  # Required HEIC plugin. / 注册已安装的 HEIC 插件。
 
 
 def check_image(path, preview):
-    try:
-        from PIL import Image, UnidentifiedImageError
-    except ImportError:
-        return verification_result("UNVERIFIED", "Pillow is not installed; image decoding was not performed.")
-    if path.suffix.lower() == ".heic":
-        try:
-            import pillow_heif
-            pillow_heif.register_heif_opener()  # Optional HEIC integration. / 可选 HEIC 插件注册。
-        except ImportError:
-            pass
     try:
         with warnings.catch_warnings():
             warnings.simplefilter("error", Image.DecompressionBombWarning)
@@ -88,7 +83,7 @@ def check_wave(path):
                 return verification_result("DAMAGED", "PCM WAV data is incomplete or contains no audio frames.")
             return verification_result("OK", "Python wave read all PCM data: {frames} frames, {rate} Hz.", frames=expected_frames, rate=audio.getframerate())
     except wave.Error:
-        return None  # Non-PCM may need miniaudio. / 非 PCM 编码交给可选解码器。
+        return None  # Non-PCM uses miniaudio. / 非 PCM 编码交给 miniaudio。
     except (OSError, EOFError) as error:
         return verification_result("DAMAGED", "WAV reading failed: {error}", error=str(error)[:300])
 
@@ -100,10 +95,6 @@ def check_audio(path):
             return checked
     if path.suffix.lower() not in {".wav", ".mp3", ".flac", ".ogg"}:
         return verification_result("UNVERIFIED", "This audio format has structural checks only; no compatible full decoder is integrated.")
-    try:
-        import miniaudio
-    except ImportError:
-        return verification_result("UNVERIFIED", "Optional miniaudio is not installed; audio structure only.")
     try:
         # Bounded PCM chunks; no playback device is opened. / 分块解码，不打开播放设备。
         audio_info = miniaudio.get_file_info(str(path))

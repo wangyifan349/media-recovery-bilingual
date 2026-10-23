@@ -22,12 +22,12 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: ${{ matrix.python }}
-      - name: Install optional image decoder
-        run: python -m pip install "Pillow>=10.4,<13"
+      - name: Install required Python libraries
+        run: python -m pip install -r requirements.txt
       - name: Run local-data tests
         run: python -X utf8 -m unittest discover -s . -p "test_*.py" -v
   audio:
-    name: Optional miniaudio checks
+    name: Python library checks
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

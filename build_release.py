@@ -54,7 +54,7 @@ def build_release(root: Path, target: Path) -> str:
 def main() -> None:
     root = Path(__file__).resolve().parent
     parser = argparse.ArgumentParser(description="Build a source ZIP and test its extracted contents.")
-    parser.add_argument("--output", type=Path, default=root.parent / "media_recovery_bilingual_v0.3.0.zip")
+    parser.add_argument("--output", type=Path, default=root.parent / "media_recovery_bilingual_v0.4.0.zip")
     arguments = parser.parse_args()
     digest = build_release(root, arguments.output)
     print(f"Source ZIP: {arguments.output.name}")

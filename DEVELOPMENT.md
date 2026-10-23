@@ -17,8 +17,8 @@
 
 ## Checks and status meanings / 校验与状态
 
-- **EN:** `OK` means only the implemented check passed. Missing libraries, unsupported codecs, timeout and inconclusive decoder rejection are `UNVERIFIED`, not proof of damage. Use `DAMAGED` for a detected error. Always preserve decoder limits and document them. Subprocess isolation/deadlines are not a security sandbox.
-- **中文：** `OK` 仅表示已实现检查通过。缺库、不支持、超时、原因不确定的解码拒绝均应为 `UNVERIFIED`，不是损坏证明；发现具体错误才用 `DAMAGED`。保留并记录解码限制，子进程隔离和限时不等于安全沙箱。
+- **EN:** Required Python libraries are imported directly; do not add missing-library fallback branches. `OK` means only the implemented check passed. Unsupported codecs, timeouts and inconclusive decoder rejections are `UNVERIFIED`, not proof of damage. Video checks remain structural, without external media programs. Use `DAMAGED` for detected content errors. Retain data/decoder/timeout exception handling; process deadlines are not a security sandbox.
+- **中文：** 直接导入必需 Python 库，不添加缺库降级分支。`OK` 仅表示已实现检查通过；不支持编码、超时、原因不确定的解码拒绝应为 `UNVERIFIED`，不是损坏证明。视频仅做结构检查，不使用外部媒体程序。发现具体内容错误才用 `DAMAGED`，保留数据、解码、超时异常处理；进程限时不是安全沙箱。
 
 ## Style / 代码风格
 

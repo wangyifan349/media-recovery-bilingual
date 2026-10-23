@@ -2,17 +2,16 @@
 
 from __future__ import annotations
 
-import importlib.util
 import json
 import os
 from pathlib import Path
 import queue
-import shutil
 import subprocess
 import sys
 import threading
 import tkinter as tk
 from tkinter import filedialog, messagebox, ttk
+from tkinter import font as tkfont
 import webbrowser
 
 from i18n import STATUS_KEYS, Translator, record_detail
@@ -35,8 +34,12 @@ class RecoveryApp:
     def __init__(self, root: tk.Tk, language: str = "zh") -> None:
         self.root = root
         self.translate = Translator(language)
-        self.root.geometry("1280x850")
-        self.root.minsize(1080, 720)
+        width = min(1480, int(root.winfo_screenwidth() * 0.92))
+        height = min(980, int(root.winfo_screenheight() * 0.90))
+        self.root.geometry(f"{width}x{height}")
+        self.root.minsize(min(980, width), min(680, height))
+        self.font_size = 14
+        self.configure_fonts()
         self.source_path = tk.StringVar()
         self.output_path = tk.StringVar()
         self.max_file_mib = tk.StringVar(value="4096")
@@ -67,9 +70,24 @@ class RecoveryApp:
         self.status_text.set(t("Select an image. Do not write anything to the physical disk with lost data."))
         self.filter_status.set(t("All"))
         self.build_menu()
-        container = ttk.Frame(self.root, padding=12)
-        container.pack(fill="both", expand=True)
-        paths = ttk.LabelFrame(container, text=t("Source and destination"), padding=8)
+        viewport = ttk.Frame(self.root)
+        viewport.pack(fill="both", expand=True)
+        canvas = tk.Canvas(viewport, highlightthickness=0)
+        page_scrollbar = ttk.Scrollbar(viewport, orient="vertical", command=canvas.yview)
+        canvas.configure(yscrollcommand=page_scrollbar.set)
+        page_scrollbar.pack(side="right", fill="y")
+        canvas.pack(side="left", fill="both", expand=True)
+        container = ttk.Frame(canvas, padding=16)
+        window = canvas.create_window((0, 0), window=container, anchor="nw")
+
+        def update_viewport(event=None):
+            canvas.itemconfigure(window, width=canvas.winfo_width(),
+                                 height=max(canvas.winfo_height(), container.winfo_reqheight()))
+            canvas.configure(scrollregion=canvas.bbox("all"))
+
+        canvas.bind("<Configure>", update_viewport)
+        container.bind("<Configure>", update_viewport)  # Small displays can scroll the whole page. / 小屏可滚动整页。
+        paths = ttk.LabelFrame(container, text=t("Source and destination"), padding=12)
         paths.pack(fill="x")
         for row, label, variable, command in (
             (0, "Source image (read-only)", self.source_path, self.choose_source),
@@ -79,35 +97,46 @@ class RecoveryApp:
             ttk.Entry(paths, textvariable=variable).grid(row=row, column=1, sticky="ew", padx=4)
             ttk.Button(paths, text=t("Browse..."), command=command).grid(row=row, column=2, padx=4)
         paths.columnconfigure(1, weight=1)
-        formats = ttk.LabelFrame(container, text=t("Formats | MP4 includes selected MOV / M4A / 3GP / HEIC / AVIF variants"), padding=6)
-        formats.pack(fill="x", pady=8)
-        for row, (group, kinds) in enumerate(recover.FORMAT_GROUPS.items()):
-            ttk.Label(formats, text=t(group), width=24).grid(row=row, column=0, sticky="w")
-            for column, kind in enumerate(kinds, 1):
-                ttk.Checkbutton(formats, text=kind.upper(), variable=self.format_vars[kind]).grid(
-                    row=row, column=column, sticky="w", padx=5)
+        formats = ttk.Notebook(container)
+        formats.pack(fill="x", pady=10)
+        for group, kinds in recover.FORMAT_GROUPS.items():
+            page = ttk.Frame(formats, padding=8)
+            formats.add(page, text=t(group))
+            for index, kind in enumerate(kinds):
+                ttk.Checkbutton(page, text=kind.upper(), variable=self.format_vars[kind]).grid(
+                    row=index // 4, column=index % 4, sticky="w", padx=12)
+            for column in range(4):
+                page.columnconfigure(column, weight=1)
         options = ttk.Frame(container)
         options.pack(fill="x")
-        ttk.Button(options, text=t("Select all"), command=lambda: self.select_formats(True)).pack(side="left")
-        ttk.Button(options, text=t("Clear"), command=lambda: self.select_formats(False)).pack(side="left", padx=4)
-        ttk.Label(options, text=t("Max file MiB")).pack(side="left", padx=(10, 4))
-        ttk.Entry(options, textvariable=self.max_file_mib, width=7).pack(side="left")
-        ttk.Checkbutton(options, text=t("Verify after recovery"), variable=self.verify_enabled).pack(side="left", padx=10)
-        ttk.Label(options, text=t("Timeout (seconds)")).pack(side="left")
-        ttk.Entry(options, textvariable=self.verify_timeout, width=6).pack(side="left", padx=4)
+        ttk.Button(options, text=t("Select all"), command=lambda: self.select_formats(True)).grid(row=0, column=0, padx=4, pady=4)
+        ttk.Button(options, text=t("Clear"), command=lambda: self.select_formats(False)).grid(row=0, column=1, padx=4)
+        ttk.Checkbutton(options, text=t("Verify after recovery"), variable=self.verify_enabled).grid(row=0, column=2, columnspan=2, sticky="w", padx=12)
+        ttk.Label(options, text=t("Max file MiB")).grid(row=1, column=0, sticky="w", padx=4, pady=6)
+        ttk.Entry(options, textvariable=self.max_file_mib, width=8).grid(row=1, column=1, sticky="w")
+        ttk.Label(options, text=t("Timeout (seconds)")).grid(row=1, column=2, sticky="w", padx=12)
+        ttk.Entry(options, textvariable=self.verify_timeout, width=7).grid(row=1, column=3, sticky="w")
         actions = ttk.Frame(container)
         actions.pack(fill="x", pady=8)
         self.scan_button = ttk.Button(actions, text=t("Read-only scan"), command=lambda: self.start(True))
-        self.scan_button.pack(side="left")
+        self.scan_button.grid(row=0, column=0, sticky="ew", padx=4, pady=4)
         self.recover_button = ttk.Button(actions, text=t("Recover and check"), command=lambda: self.start(False))
-        self.recover_button.pack(side="left", padx=8)
+        self.recover_button.grid(row=0, column=1, sticky="ew", padx=4, pady=4)
         self.stop_button = ttk.Button(actions, text=t("Stop"), command=self.stop, state="disabled")
-        self.stop_button.pack(side="left")
-        ttk.Button(actions, text=t("Open image gallery"), command=self.open_gallery).pack(side="right")
-        ttk.Button(actions, text=t("Open results folder"), command=self.open_directory).pack(side="right", padx=8)
+        self.stop_button.grid(row=0, column=2, sticky="ew", padx=4, pady=4)
+        ttk.Button(actions, text=t("Open image gallery"), command=self.open_gallery).grid(row=1, column=0, sticky="ew", padx=4)
+        ttk.Button(actions, text=t("Open results folder"), command=self.open_directory).grid(row=1, column=1, sticky="ew", padx=4)
+        text_controls = ttk.Frame(actions)
+        text_controls.grid(row=1, column=2, sticky="e")
+        ttk.Button(text_controls, text="A−", width=4, command=lambda: self.change_font_size(-1)).pack(side="left", padx=2)
+        ttk.Button(text_controls, text="A+", width=4, command=lambda: self.change_font_size(1)).pack(side="left", padx=2)
+        for column in range(3):
+            actions.columnconfigure(column, weight=1)
         self.progress = ttk.Progressbar(container, maximum=100)
         self.progress.pack(fill="x")
-        ttk.Label(container, textvariable=self.status_text, wraplength=1180).pack(anchor="w", pady=4)
+        status_label = ttk.Label(container, textvariable=self.status_text, wraplength=900)
+        status_label.pack(fill="x", pady=6)
+        status_label.bind("<Configure>", lambda event: status_label.configure(wraplength=max(200, event.width - 12)))
         result_bar = ttk.Frame(container)
         result_bar.pack(fill="x")
         ttk.Label(result_bar, text=t("Filter:")).pack(side="left")
@@ -115,8 +144,10 @@ class RecoveryApp:
                                 values=[t("All"), *(t.status(status) for status in STATUS_KEYS)])
         selector.pack(side="left")
         selector.bind("<<ComboboxSelected>>", lambda event: self.refresh_results())
-        ttk.Label(result_bar, text=t("OK means the specified check passed, not proof of original integrity.")).pack(side="left", padx=12)
-        results = ttk.Panedwindow(container, orient="horizontal")
+        explanation = ttk.Label(container, text=t("OK means the specified check passed, not proof of original integrity."), wraplength=900)
+        explanation.pack(fill="x", pady=4)
+        explanation.bind("<Configure>", lambda event: explanation.configure(wraplength=max(200, event.width - 12)))
+        results = ttk.Panedwindow(container, orient="horizontal", height=260)
         results.pack(fill="both", expand=True, pady=6)
         table_frame = ttk.Frame(results)
         self.table = ttk.Treeview(table_frame, columns=("status", "name", "size"), show="headings", selectmode="browse")
@@ -124,22 +155,47 @@ class RecoveryApp:
             self.table.heading(column, text=t(title))
             self.table.column(column, width=width)
         scrollbar = ttk.Scrollbar(table_frame, orient="vertical", command=self.table.yview)
-        self.table.configure(yscrollcommand=scrollbar.set)
-        self.table.pack(side="left", fill="both", expand=True)
-        scrollbar.pack(side="right", fill="y")
+        horizontal = ttk.Scrollbar(table_frame, orient="horizontal", command=self.table.xview)
+        self.table.configure(yscrollcommand=scrollbar.set, xscrollcommand=horizontal.set)
+        self.table.grid(row=0, column=0, sticky="nsew")
+        scrollbar.grid(row=0, column=1, sticky="ns")
+        horizontal.grid(row=1, column=0, sticky="ew")
+        table_frame.rowconfigure(0, weight=1)
+        table_frame.columnconfigure(0, weight=1)
         for status, color in (("OK", "#168046"), ("DAMAGED", "#c03333"), ("UNVERIFIED", "#916100")):
             self.table.tag_configure(status, foreground=color)
         self.table.bind("<<TreeviewSelect>>", self.show_preview)
         self.table.bind("<Double-1>", lambda event: self.open_selected())
         results.add(table_frame, weight=3)
         preview_frame = ttk.LabelFrame(results, text=t("Image preview / verification details"), padding=10)
-        self.preview_label = ttk.Label(preview_frame, text=t("Select a result to preview it."), anchor="center")
+        self.preview_label = ttk.Label(preview_frame, text=t("Select a result to preview it."), anchor="center", wraplength=320)
         self.preview_label.pack(fill="both", expand=True)
         self.detail_label = ttk.Label(preview_frame, text="", wraplength=340)
         self.detail_label.pack(fill="x", pady=8)
+        preview_frame.bind("<Configure>", lambda event: self.detail_label.configure(wraplength=max(180, event.width - 24)))
         results.add(preview_frame, weight=1)
-        self.log_text = tk.Text(container, height=5, wrap="word", state="disabled")
+        self.log_text = tk.Text(container, height=3, wrap="word", state="disabled", font="TkFixedFont", padx=10, pady=8)
         self.log_text.pack(fill="x")
+
+    def configure_fonts(self) -> None:
+        """Point sizes follow Tk DPI scaling. 点字号遵循 Tk 的 DPI 缩放。"""
+        for name in ("TkDefaultFont", "TkTextFont", "TkMenuFont", "TkCaptionFont", "TkSmallCaptionFont", "TkIconFont"):
+            tkfont.nametofont(name, root=self.root).configure(size=self.font_size)
+        tkfont.nametofont("TkHeadingFont", root=self.root).configure(size=self.font_size, weight="bold")
+        tkfont.nametofont("TkFixedFont", root=self.root).configure(size=max(11, self.font_size - 1))
+        style = ttk.Style(self.root)
+        style.configure(".", font="TkDefaultFont")
+        style.configure("TButton", padding=(12, 8))
+        style.configure("TCheckbutton", padding=(6, 5))
+        style.configure("TNotebook.Tab", padding=(16, 8))
+        line_height = tkfont.nametofont("TkDefaultFont", root=self.root).metrics("linespace")
+        style.configure("Treeview", font="TkDefaultFont", rowheight=line_height + 16)
+        style.configure("Treeview.Heading", font="TkHeadingFont", padding=(8, 8))
+        self.root.option_add("*Font", "TkDefaultFont")
+
+    def change_font_size(self, amount: int = 0) -> None:
+        self.font_size = max(11, min(22, self.font_size + amount)) if amount else 14
+        self.configure_fonts()  # Keep tasks and results intact. / 保留任务及结果。
 
     def build_menu(self) -> None:
         t = self.translate
@@ -150,7 +206,8 @@ class RecoveryApp:
             "Recovery": [("Scan without exporting", lambda: self.start(True)), ("Recover and check", lambda: self.start(False)), ("Stop task", self.stop)],
             "Preview": [("Open image gallery", self.open_gallery), ("Open selected media...", self.open_selected)],
             "Language": [("English", lambda: self.change_language("en")), ("Chinese", lambda: self.change_language("zh"))],
-            "Help": [("Check optional dependencies", self.show_dependencies), ("Formats and limitations", self.show_limits)],
+            "Text size": [("Larger text", lambda: self.change_font_size(1)), ("Smaller text", lambda: self.change_font_size(-1)), ("Reset text size", self.change_font_size)],
+            "Help": [("Required libraries", self.show_dependencies), ("Formats and limitations", self.show_limits)],
         }
         for section, commands in sections.items():
             submenu = tk.Menu(menu, tearoff=False)
@@ -399,12 +456,10 @@ class RecoveryApp:
 
     def show_dependencies(self) -> None:
         t = self.translate
-        states = [f"{name}: {t('Installed') if importlib.util.find_spec(name) else t('Not installed (optional)')}" for name in ("PIL", "miniaudio")]
-        states.append(f"{t('FFmpeg (optional; video checks only)')}: {t('Available') if shutil.which('ffmpeg') else t('Not found')}")
-        messagebox.showinfo(t("Dependency check"), "\n".join(states) + t("\n\nOptional installation (you run it yourself):\npython -m pip install Pillow miniaudio\n\nPCM WAV uses Python's wave module. Audio does not call FFmpeg or require Windows audio components. miniaudio contains native code; it is not pure Python."), parent=self.root)
+        messagebox.showinfo(t("Required libraries"), t("Required: Pillow, miniaudio, pillow-heif. Install requirements.txt before starting. Libraries are imported directly; no missing-library fallback is provided. No external FFmpeg is used. Videos receive structural checks only."), parent=self.root)
 
     def show_limits(self) -> None:
-        self.notify("showinfo", "Limitations", "Only contiguous data in raw images is carved; the source is opened read-only.\nNo original names, disk-fragment reassembly, repair or guaranteed recovery.\n\nMKV/WebM: finite Segment sizes only. MP3/AAC/AMR/FLV/MP4/PDF boundaries include heuristics.\nZIP: no ZIP64 or split archives. TIFF: not all private RAW tags.\nHEIC needs an optional Pillow plugin; AVIF depends on the Pillow build.\n\nPassing a check does not prove the file matches the original or is safe.")
+        self.notify("showinfo", "Limitations", "Only contiguous data in raw images is carved; the source is opened read-only.\nNo original names, disk-fragment reassembly, repair or guaranteed recovery.\nVideo structure only; no video decoder is used.")
 
     def stop(self) -> None:
         if self.is_running():

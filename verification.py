@@ -3,7 +3,6 @@
 import html
 import json
 from pathlib import Path
-import shutil
 import subprocess
 import sys
 import tempfile
@@ -66,19 +65,7 @@ def _verify_file(path, preview_directory, timeout=120, cancel_event=None):
                 checked["preview"] = str(preview.relative_to(path.parent).as_posix())
             return checked
         if extension in VIDEO_EXTENSIONS:
-            ffmpeg = shutil.which("ffmpeg")
-            if ffmpeg is None:
-                return verification_result("UNVERIFIED", "Optional FFmpeg was not found; video structure only.")
-            # Restrict protocols and avoid the shell. / 限制输入协议，禁止调用 shell。
-            command = [ffmpeg, "-nostdin", "-v", "error", "-xerror", "-err_detect", "explode",
-                       "-protocol_whitelist", "file,pipe", "-threads", "1", "-i", str(path.resolve()),
-                       "-map", "0:v?", "-map", "0:a?", "-f", "null", "-"]
-            code, _ = run_process(command, timeout, cancel_event, subprocess.DEVNULL)
-            if code is None:
-                return verification_result("UNVERIFIED", "Video verification timed out or was cancelled before completion.")
-            if code != 0:
-                return verification_result("UNVERIFIED", "FFmpeg decoding failed: possible damage or unsupported codec.")
-            return verification_result("OK", "FFmpeg completed decoding without a reported error; equality to the original is not proven.")
+            return verification_result("UNVERIFIED", "Video structure only; no video decoder is used.")
         return verification_result("UNVERIFIED", "Structure only; full content verification was not performed.")
     except (OSError, ValueError, TypeError) as error:
         return verification_result("UNVERIFIED", "Verification unavailable: {error}", error=str(error)[:300])
@@ -118,7 +105,7 @@ def _write_gallery_page(directory, records, language, filename):
     document = (f'<!doctype html><html lang="{"zh-CN" if language == "zh" else "en"}"><meta charset="utf-8">'
                 '<meta http-equiv="Content-Security-Policy" content="default-src \'none\'; '
                 'img-src \'self\'; style-src \'unsafe-inline\'">'
-                f'<title>{translate("Recovered results")}</title><style>body{{font:15px sans-serif;background:#edf1f5;padding:24px}}'
+                f'<title>{translate("Recovered results")}</title><style>body{{font:18px/1.6 sans-serif;background:#edf1f5;padding:24px}}'
                 'main{display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:16px}'
                 'article{background:white;padding:16px;border-top:5px solid #d99d24;overflow-wrap:anywhere}'
                 '.OK{border-color:#26945f}.DAMAGED{border-color:#d84a4a}'

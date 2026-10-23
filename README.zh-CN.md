@@ -31,22 +31,25 @@ python start.py --language en      # 显式选择英文
 
 源码包不含第三方库，不会自动安装、不需要账户登录、不含遥测，也不由程序主动发起网络请求。这些说明仅针对程序本身，不包含操作系统或你启动的浏览器、查看器的行为。
 
-### 📦 可选依赖——仅在你选择时自行安装
+### 📦 必需 Python 库
 
-核心提取和 PCM WAV 检查使用 Python 标准库。已具备相应依赖时才启用以下可选校验：
+启动前请安装以下 Python 库。它们直接导入，不提供缺库降级分支。核心提取和 PCM WAV 读取使用标准库算法，但程序启动时会导入校验库：
 
 ```bash
 python -m pip install -r requirements.txt
 ```
 
-| 组件 | 用途 | 缺少时 |
+| 组件 | 用途 | 要求 |
 | --- | --- | --- |
-| Pillow | 图片识别、完整性检查、所有暴露帧/页解码及缩略图 | 仍能恢复，图片标为 `UNVERIFIED` |
-| miniaudio | 流式解码受支持的 MP3、FLAC、Ogg Vorbis 和非 PCM WAV | PCM WAV 仍使用 `wave`，其他音频不充分验证 |
-| `pillow-heif`（另行可选安装） | 安装后自动注册 HEIC 插件 | 仍可提取 HEIC，但可能无法解码 |
-| `PATH` 中的 FFmpeg 可执行程序（另行可选提供） | 仅用于视频解码校验 | 视频标为 `UNVERIFIED` |
+| Pillow | 图片识别、完整性检查、暴露帧/页解码及缩略图 | 必需 |
+| miniaudio | 流式解码受支持的 MP3、FLAC、Ogg Vorbis 和非 PCM WAV | 必需 |
+| pillow-heif | 注册 HEIC 解码插件 | 必需 |
 
-**音频绝不调用 FFmpeg 或 Windows 专属音频组件。** miniaudio 跨平台，但包含原生代码和 CFFI，**不是纯 Python**；Pillow 也包含原生组件。离线安装依赖需要适合 Python/操作系统的 wheel 及其依赖，源码 ZIP 不包含它们。AVIF 解码能力取决于安装的 Pillow 构建及编码支持。
+**所有检查只用 Python 代码或库，不调用 FFmpeg 可执行程序、外部播放器或其他外部媒体工具。** 隔离校验工作进程是另一个 Python 进程，不是外部媒体工具。视频只检查结构，结果保留 `UNVERIFIED`；安装这些库不会提供完整视频解码。miniaudio、Pillow、pillow-heif 包含原生组件，仅使用 Python 包**不等于纯 Python**。离线安装需匹配的 wheel 及依赖，源码包不包含它们。AVIF 取决于 Pillow 的编码支持。缺少必需库会正常抛出导入错误；损坏数据、解码失败、超时的异常处理仍保留。
+
+### 🔠 更大、可调的界面字体
+
+默认界面字号 **14 磅**，菜单和表头同步放大，按钮增加留白，结果行加高。可用 **A− / A+** 或“字号”菜单在 11–22 磅之间调整，无须停止恢复；重置回到 14 磅。同次运行切换语言会保留字号。格式分组改为选项卡，参数和操作分行布局，长说明自动换行，结果提供双向滚动条，小屏可纵向滚动整页。窗口大小随显示区域调整；极小显示区域或很大字号仍可能需要调整窗口或减小字号。离线预览文字也已放大。
 
 ## 🖱️ 3. 图形界面流程
 
@@ -79,10 +82,10 @@ python -m pip install -r requirements.txt
 | `ogg` | `.ogg`、`.opus` | Ogg 页边界、序号/序列号、CRC、EOS；OpusHead 扩展名提示 | miniaudio 检查受支持 Ogg Vorbis；Opus 仅结构检查 |
 | `aiff` | `.aiff` | AIFF/AIFC FORM、COMM/SSND 和块边界 | 仅结构检查 |
 | `au` | `.au` | AU 头、已知数据长度和基本参数 | 仅结构检查 |
-| `mp4` | `.mp4`、`.mov`、`.m4a`、`.3gp`、`.heic`、`.avif` | 部分 ftyp 品牌、允许的连续 box；基本 moov/mdat 或 meta/mdat | 视频用 FFmpeg；图片用 Pillow/插件；M4A 仅结构检查 |
-| `avi` | `.avi` | 一个 RIFF AVI 范围、顶层块边界及 LIST 存在性 | FFmpeg；不重组 AVI/OpenDML 延续段 |
-| `mkv` | `.mkv`、`.webm` | EBML DocType 提示和**有限长度** Segment | FFmpeg；拒绝未知长度 Segment |
-| `flv` | `.flv` | 头、部分 tag 类型、长度及 PreviousTagSize | FFmpeg；边界为推断 |
+| `mp4` | `.mp4`、`.mov`、`.m4a`、`.3gp`、`.heic`、`.avif` | 部分 ftyp 品牌、允许的连续 box；基本 moov/mdat 或 meta/mdat | 图片用 Pillow/插件；视频和 M4A 仅结构检查 |
+| `avi` | `.avi` | 一个 RIFF AVI 范围、顶层块边界及 LIST 存在性 | 仅结构检查；不重组 AVI/OpenDML 延续段 |
+| `mkv` | `.mkv`、`.webm` | EBML DocType 提示和**有限长度** Segment | 仅结构检查；拒绝未知长度 Segment |
+| `flv` | `.flv` | 头、部分 tag 类型、长度及 PreviousTagSize | 仅结构检查；边界为推断 |
 | `pdf` | `.pdf` | 头和附近带 `startxref` 的首个 `%%EOF` | 仅结构检查；可能恢复较早增量版本，而不是最新文档 |
 | `zip` | `.zip`、`.docx`、`.xlsx`、`.pptx`、`.epub` | EOCD 和中央目录；按成员名推测扩展名 | 标准库成员读取/CRC；**不验证 Office/EPUB 文档语义** |
 
@@ -100,7 +103,7 @@ python -m pip install -r requirements.txt
 | --- | --- | --- |
 | `OK__` | 实现的解码/读取/CRC 检查未发生指定失败并完成 | 完美恢复、与原内容一致、语义正确、所有编码特性已检查或无恶意内容 |
 | `DAMAGED__` | 受支持检查发现具体内容错误、空解码或数据不足 | 其他所有文件都已充分检查 |
-| `UNVERIFIED__` | 无兼容解码器、缺依赖、不支持编码、跳过、超时、安全限制或失败原因不确定 | 一定损坏或一定可用 |
+| `UNVERIFIED__` | 未集成兼容解码器、不支持编码、跳过、超时、安全限制或失败原因不确定 | 一定损坏或一定可用 |
 
 检查能力取决于库报告的结果。解码器可能隐藏错误或接受截断但仍能解码的内容。miniaudio 样本数对比允许 **8192 个交错样本**的容差，不是精确原始长度验证。PCM WAV 只检查声明帧的字节数，不判断听起来是否正常。
 
@@ -168,9 +171,9 @@ Windows 可以使用 `"E:\images\disk.img"`、`"F:\Recovered"` 一类路径，**
 python -X utf8 -m unittest discover -s . -p "test_*.py" -v
 ```
 
-测试使用临时生成的媒体/容器结构样本；Pillow 测试还生成小型真实图片。覆盖边界、畸形/截断结构、不覆盖导出、哈希、取消、翻译占位符、纯英文展示及两语言字节/状态一致性。GUI 测试需要交互显示环境，在 GitHub Actions 或无 Tk/显示环境时跳过；缺依赖时跳过相应可选解码器测试。合成 MP3/MP4 样本**只验证结构，不证明真实音视频解码覆盖**。
+测试使用临时生成的媒体/容器结构样本；Pillow 测试还生成小型真实图片。覆盖边界、畸形/截断结构、不覆盖导出、哈希、取消、翻译占位符、纯英文展示及两语言字节/状态一致性。必须先安装依赖。GUI 测试需要交互显示环境，在 GitHub Actions 或无 Tk/显示环境时跳过。合成 MP3/MP4 样本**只验证结构，不证明真实音视频解码覆盖**。
 
-GitHub Actions 配置了 Python 3.10/3.13 的 Linux、Windows、macOS 测试，以及可选 miniaudio 任务。配置不等于远端实际全部通过，请查看具体提交的 Actions 结果。发布内容不包含开发机器的诊断信息或环境清单。
+GitHub Actions 安装依赖后测试 Python 3.10/3.13 的 Linux、Windows、macOS，并设置 Python 库测试任务。配置本身不等于实际通过，请查看具体提交的 Actions 结果。发布内容不包含开发机器的诊断信息或环境清单。
 
 | 文件 | 职责 |
 | --- | --- |

@@ -1,6 +1,7 @@
 """Language parity and presentation isolation tests. 语言一致性与展示隔离测试。"""
 
 import json
+import ast
 import os
 from pathlib import Path
 import re
@@ -81,7 +82,7 @@ class TranslationTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "video.mp4"
             path.write_bytes(b"structure fixture")
-            with patch("verification.shutil.which", return_value=None):
+            with patch("verification.run_process", side_effect=AssertionError("Video must not launch programs")):
                 checked = verification.verify_file(path, path.parent / "previews", language="en")
             self.assertEqual(checked["detail"], checked["detail_en"])
             self.assertFalse(HAN_CHARACTERS.search(checked["detail"]))
@@ -109,6 +110,24 @@ class TranslationTests(unittest.TestCase):
             document = (root / filename).read_text(encoding="utf-8")
             selectors = re.findall(r"^\| `([a-z0-9]+)` \|", document.split("## ✅", 1)[0], re.MULTILINE)
             self.assertEqual(selectors, list(recover.PUBLIC_TYPES))
+
+    def test_required_libraries_are_not_guarded_by_importerror(self):
+        root = Path(__file__).resolve().parent
+        for filename in ("validation_worker.py", "verification.py", "app.py"):
+            tree = ast.parse((root / filename).read_text(encoding="utf-8"))
+            for node in ast.walk(tree):
+                if isinstance(node, ast.ExceptHandler) and node.type is not None:
+                    self.assertNotIn("ImportError", ast.unparse(node.type))
+
+    def test_media_worker_only_launches_python(self):
+        with tempfile.TemporaryDirectory() as temporary:
+            path = Path(temporary) / "image.png"
+            path.write_bytes(make_png())
+            checked = verification_result("OK", "Pillow decoded all {frames} frames/pages.", frames=1)
+            with patch("verification.run_process", return_value=(0, json.dumps(checked))) as worker:
+                self.assertEqual(verification.verify_file(path, path.parent / "previews")["status"], "OK")
+            self.assertEqual(worker.call_args.args[0][0], sys.executable)
+            self.assertTrue(worker.call_args.args[0][3].endswith("validation_worker.py"))
 
 
 class GuiLanguageTests(unittest.TestCase):
@@ -158,6 +177,13 @@ class GuiLanguageTests(unittest.TestCase):
         self.root.update()
         check_widgets(self.root)
         self.assertEqual(len(application.records), 1)
+        self.assertEqual(application.font_size, 14)
+        application.change_font_size(2)
+        self.assertEqual(application.font_size, 16)
+        application.change_language("zh")
+        self.assertEqual(application.font_size, 16)
+        application.change_font_size()
+        self.assertEqual(application.font_size, 14)
 
 
 if __name__ == "__main__":

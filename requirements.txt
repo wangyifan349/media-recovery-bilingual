@@ -1,3 +1,4 @@
-# Optional decoders; the core scanner uses the standard library. / 可选解码器，核心扫描仅用标准库。
+# Required Python libraries; no external FFmpeg executable. / 必需 Python 库，无外部 FFmpeg 依赖。
 Pillow>=10.4,<13
 miniaudio>=1.61,<2
+pillow-heif>=0.18,<2

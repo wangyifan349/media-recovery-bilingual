@@ -1,7 +1,6 @@
 import array
 import contextlib
 import hashlib
-import importlib.util
 import io
 import json
 from pathlib import Path
@@ -183,7 +182,6 @@ class ExtendedTests(unittest.TestCase):
         self.assertEqual(checked["status"], "OK")
         self.assertFalse((self.root / "do_not_extract.txt").exists())
 
-    @unittest.skipUnless(importlib.util.find_spec("PIL"), "Pillow not installed")
     def test_real_images_carve_decode_preview(self):
         from PIL import Image as PillowImage
         formats = [("GIF", "gif", {}), ("BMP", "bmp", {}), ("ICO", "ico", {}),
@@ -201,7 +199,6 @@ class ExtendedTests(unittest.TestCase):
                 self.assertEqual(checked["status"], "OK", checked)
                 self.assertTrue((self.root / checked["preview"]).is_file())
 
-    @unittest.skipUnless(importlib.util.find_spec("PIL"), "Pillow not installed")
     def test_animated_gif_all_frames(self):
         from PIL import Image as PillowImage
         buffer = io.BytesIO()
@@ -227,20 +224,19 @@ class ExtendedTests(unittest.TestCase):
         path.write_bytes(make_wav()[:-2])
         self.assertEqual(validation_worker.check_audio(path)["status"], "DAMAGED")
 
-    def test_missing_audio_decoder_not_marked_ok(self):
+    def test_audio_decoder_rejection_not_marked_ok(self):
         path = self.root / "audio.mp3"
         path.write_bytes(make_mp3())
-        with patch.dict(sys.modules, {"miniaudio": None}):
+        with patch("validation_worker.miniaudio.get_file_info", side_effect=ValueError("Unsupported codec")):
             self.assertEqual(validation_worker.check_audio(path)["status"], "UNVERIFIED")
 
     def test_unsupported_audio_never_invokes_ffmpeg(self):
         path = self.root / "audio.aac"
         path.write_bytes(make_aac())
-        with patch("verification.shutil.which", side_effect=AssertionError("audio must not use ffmpeg")):
-            checked = verification.verify_file(path, self.root / "previews")
+        with patch("validation_worker.miniaudio.get_file_info", side_effect=AssertionError("AAC has no integrated decoder")):
+            checked = validation_worker.check_audio(path)
         self.assertEqual(checked["status"], "UNVERIFIED")
 
-    @unittest.skipUnless(importlib.util.find_spec("miniaudio"), "optional miniaudio not installed")
     def test_native_audio_library_real_decode(self):
         for extension, data in (("wav", make_wav()), ("flac", make_flac()), ("flac", make_flac("fixed", 2))):
             path = self.root / f"audio.{extension}"
@@ -268,10 +264,10 @@ class ExtendedTests(unittest.TestCase):
         self.assertEqual(code, 130)
         self.assertEqual(path.read_bytes(), make_png())
 
-    def test_missing_video_decoder(self):
+    def test_video_never_launches_external_decoder(self):
         path = self.root / "video.mp4"
         path.write_bytes(b"not video")
-        with patch("verification.shutil.which", return_value=None):
+        with patch("verification.run_process", side_effect=AssertionError("No external video programs")):
             self.assertEqual(verification.verify_file(path, self.root / "previews")["status"], "UNVERIFIED")
 
     def test_gallery_escapes_names(self):
