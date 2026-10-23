@@ -7,7 +7,7 @@ import re
 
 
 ROOT_FILES = {
-    "app.py", "extra_formats.py", "flac_carver.py", "i18n.py", "recover.py",
+    "app.py", "build_release.py", "extra_formats.py", "flac_carver.py", "i18n.py", "recover.py",
     "recovery_gui.py", "release_check.py", "start.py", "start_en.py", "start_zh.py",
     "validation_worker.py", "verification.py", "test_extended.py", "test_i18n.py",
     "test_recover.py", "README.md", "README.zh-CN.md", "DEVELOPMENT.md",

@@ -181,6 +181,7 @@ GitHub Actions is configured for Python 3.10/3.13 on Linux, Windows and macOS, p
 | `extra_formats.py`, `flac_carver.py` | Additional bounded structural parsers |
 | `validation_worker.py`, `verification.py` | Decoder subprocesses, statuses and dual-language galleries |
 | `i18n.py` | Central English/Chinese messages and bilingual explanations |
+| `release_check.py`, `build_release.py` | Publication allowlist/privacy patterns and retested, normalized source ZIPs |
 | `test_*.py` | Regression and language-consistency tests |
 
 Identifiers use English. Critical inline comments/docstrings are bilingual to keep one auditable implementation. Comments explain invariants and non-obvious boundaries rather than repeating every Python statement. See [the bilingual development notes](DEVELOPMENT.md) before changing parsers or translations.

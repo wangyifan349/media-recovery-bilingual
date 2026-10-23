@@ -181,6 +181,7 @@ GitHub Actions 配置了 Python 3.10/3.13 的 Linux、Windows、macOS 测试，�
 | `extra_formats.py`、`flac_carver.py` | 更多限定范围的结构解析器 |
 | `validation_worker.py`、`verification.py` | 解码子进程、状态和双语预览 |
 | `i18n.py` | 集中中英文消息及双语校验说明 |
+| `release_check.py`、`build_release.py` | 发布白名单/隐私模式检查，以及复测、元数据规范化的源码 ZIP |
 | `test_*.py` | 回归和语言一致性测试 |
 
 标识符使用规范英文；关键行尾注释/文档字符串为中英双语，维持一套可审计逻辑。注释解释约束和不易理解的边界，不逐句重复 Python 代码。修改解析器或翻译前请查看[双语开发说明](DEVELOPMENT.md)。
