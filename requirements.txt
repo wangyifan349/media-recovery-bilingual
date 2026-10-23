@@ -1,0 +1,3 @@
+# Optional decoders; the core scanner uses the standard library. / 可选解码器，核心扫描仅用标准库。
+Pillow>=10.4,<13
+miniaudio>=1.61,<2
