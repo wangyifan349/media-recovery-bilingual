@@ -202,3 +202,11 @@ For irreplaceable data, evaluate mature tools such as PhotoRec/TestDisk or profe
 - **🏷️ Organize before deleting.** Use clear dated folders and meaningful filenames, keep a simple list of where each backup lives, and review duplicates carefully. Confirm at least one independent, tested copy before removing originals or reorganizing large collections.
 
 > 🌱 The best recovery plan is a recent, independent and tested backup. This tool is a fallback for accidents—not a substitute for backup.
+
+## 🤝 A note from the author
+
+This personal project is shared in good faith to help others. My skills outside my professional work are limited, so I cannot make the software fully polished or as powerful and comprehensive as a professional recovery product. Thank you for your understanding. The software already provides basic recovery and checking functions, but successful recovery is not guaranteed.
+
+This project is licensed under the **GNU General Public License, version 3 only (`GPL-3.0-only`)**; see the complete [LICENSE](LICENSE). It is provided without warranty, as described in the license. Third-party libraries retain their own licenses.
+
+**📜 License: GPL 3.0 (`GPL-3.0-only`) · ✍️ Author: 王一帆 (Wang Yifan)**

@@ -119,6 +119,16 @@ class TranslationTests(unittest.TestCase):
                 if isinstance(node, ast.ExceptHandler) and node.type is not None:
                     self.assertNotIn("ImportError", ast.unparse(node.type))
 
+    def test_bilingual_author_and_license_footer(self):
+        root = Path(__file__).resolve().parent
+        for filename in ("README.md", "README.zh-CN.md"):
+            last_line = (root / filename).read_text(encoding="utf-8").strip().splitlines()[-1]
+            self.assertIn("王一帆", last_line)
+            self.assertIn("GPL-3.0-only", last_line)
+        license_text = (root / "LICENSE").read_text(encoding="utf-8")
+        self.assertIn("Version 3, 29 June 2007", license_text)
+        self.assertIn("END OF TERMS AND CONDITIONS", license_text)
+
     def test_media_worker_only_launches_python(self):
         with tempfile.TemporaryDirectory() as temporary:
             path = Path(temporary) / "image.png"

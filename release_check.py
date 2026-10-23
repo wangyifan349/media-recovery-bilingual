@@ -11,7 +11,7 @@ ROOT_FILES = {
     "recovery_gui.py", "release_check.py", "start.py", "start_en.py", "start_zh.py",
     "validation_worker.py", "verification.py", "test_extended.py", "test_i18n.py",
     "test_recover.py", "README.md", "README.zh-CN.md", "DEVELOPMENT.md",
-    "requirements.txt", ".gitignore", ".gitattributes", ".editorconfig",
+    "requirements.txt", "LICENSE", ".gitignore", ".gitattributes", ".editorconfig",
 }
 RELATIVE_FILES = ROOT_FILES | {".github/workflows/tests.yml"}
 LEAK_PATTERNS = {
